@@ -54,6 +54,7 @@
       border-radius: 15px;
       max-width: 85%;
       line-height: 1.4;
+      word-wrap: break-word;
     }
 
     .user {
@@ -101,153 +102,228 @@
 
 <script>
 
+const BACKEND_URL =
+  "https://script.google.com/macros/s/AKfycbyC4l6Y_Kapy90VtWeqI-qa35HtrC6VWU0o4zTfvY8CJh7fxQSefTuUiJ8YnSM9HJ0S/exec";
+
+
 const SpeechRecognition =
   window.SpeechRecognition ||
   window.webkitSpeechRecognition;
 
 let recognition;
 
+
 if (SpeechRecognition) {
+
   recognition = new SpeechRecognition();
 
   recognition.lang = "hi-IN";
   recognition.continuous = false;
   recognition.interimResults = false;
 
+
   recognition.onstart = function() {
+
     document.getElementById("status").innerText =
       "🎧 सुन रहा हूँ...";
+
   };
+
 
   recognition.onresult = function(event) {
 
-    const text = event.results[0][0].transcript;
+    const text =
+      event.results[0][0].transcript;
 
     addMessage("You", text, "user");
 
-    respond(text);
+    askAI(text);
+
   };
 
-  recognition.onerror = function() {
+
+  recognition.onerror = function(event) {
+
+    console.log("Mic error:", event.error);
+
     document.getElementById("status").innerText =
       "❌ Mic permission check करो";
+
   };
 
+
   recognition.onend = function() {
+
     document.getElementById("status").innerText =
       "Tap 🎤 and speak";
+
   };
 
 } else {
 
-  alert("इस browser में voice recognition supported नहीं है.");
+  alert(
+    "इस browser में voice recognition supported नहीं है."
+  );
+
 }
+
 
 
 function startListening() {
 
   if (!recognition) return;
 
-  recognition.start();
+  try {
+
+    recognition.start();
+
+  } catch (error) {
+
+    console.log(error);
+
+  }
+
 }
+
 
 
 function addMessage(name, text, type) {
 
-  const chat = document.getElementById("chat");
+  const chat =
+    document.getElementById("chat");
 
-  const div = document.createElement("div");
+  const div =
+    document.createElement("div");
 
-  div.className = "message " + type;
+  div.className =
+    "message " + type;
 
-  div.innerHTML = "<b>" + name + ":</b><br>" + text;
+  div.innerHTML =
+    "<b>" +
+    name +
+    ":</b><br>" +
+    escapeHTML(text);
 
   chat.appendChild(div);
 
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop =
+    chat.scrollHeight;
+
 }
 
 
-function respond(text) {
 
-  let answer = "";
+function escapeHTML(text) {
 
-  const lower = text.toLowerCase();
+  const div =
+    document.createElement("div");
 
+  div.textContent = text;
 
-  if (
-    lower.includes("hello") ||
-    lower.includes("hi") ||
-    lower.includes("हेलो") ||
-    lower.includes("हाय")
-  ) {
+  return div.innerHTML;
 
-    answer = "Hello! 😎 मैं तुम्हारा AI assistant हूँ।";
-
-  }
-
-  else if (
-    lower.includes("kaise ho") ||
-    lower.includes("कैसे हो")
-  ) {
-
-    answer = "मैं बढ़िया हूँ 😎 तुम कैसे हो?";
-
-  }
-
-  else if (
-    lower.includes("naam") ||
-    lower.includes("नाम")
-  ) {
-
-    answer = "मेरा नाम My AI Assistant है।";
-
-  }
-
-  else if (
-    lower.includes("thank") ||
-    lower.includes("धन्यवाद")
-  ) {
-
-    answer = "You're welcome! ❤️";
-
-  }
-
-  else if (
-    lower.includes("bye") ||
-    lower.includes("बाय")
-  ) {
-
-    answer = "Bye! फिर बात करते हैं। 👋";
-
-  }
-
-  else {
-
-    answer =
-      "मैंने सुना: " +
-      text +
-      ". अभी मैं basic mode में हूँ। बाद में हम इसमें असली AI जोड़ेंगे। 🤖";
-  }
-
-
-  addMessage("Assistant", answer, "assistant");
-
-  speak(answer);
 }
+
+
+
+async function askAI(text) {
+
+  const status =
+    document.getElementById("status");
+
+  status.innerText =
+    "🤖 AI सोच रहा है...";
+
+
+  try {
+
+    const response =
+      await fetch(BACKEND_URL, {
+
+        method: "POST",
+
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+
+        body: JSON.stringify({
+          message: text
+        })
+
+      });
+
+
+    const data =
+      await response.json();
+
+
+    if (data.error) {
+
+      throw new Error(data.error);
+
+    }
+
+
+    const answer =
+      data.reply;
+
+
+    addMessage(
+      "Assistant",
+      answer,
+      "assistant"
+    );
+
+
+    speak(answer);
+
+
+    status.innerText =
+      "Tap 🎤 and speak";
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    const errorMessage =
+      "Sorry 😔 AI से connection नहीं हो पाया।";
+
+    addMessage(
+      "Assistant",
+      errorMessage,
+      "assistant"
+    );
+
+    speak(errorMessage);
+
+    status.innerText =
+      "❌ Connection error";
+
+  }
+
+}
+
 
 
 function speak(text) {
 
-  const speech = new SpeechSynthesisUtterance(text);
+  const speech =
+    new SpeechSynthesisUtterance(text);
 
-  speech.lang = "hi-IN";
-  speech.rate = 1;
-  speech.pitch = 1;
+  speech.lang =
+    "hi-IN";
+
+  speech.rate =
+    1;
+
+  speech.pitch =
+    1;
 
   window.speechSynthesis.cancel();
 
   window.speechSynthesis.speak(speech);
+
 }
 
 </script>
